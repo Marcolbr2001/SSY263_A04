@@ -297,7 +297,7 @@ void Robot2WCtrl::timer_callback()
       odom_data_mutex_.unlock();
  
       // TODO_5: Extract the robot's position and orientation from "odom" into the variables "pos" and "odom_q"
-      pos = odom->pose.pose.position;
+      pos = odom->pose.pose.position;     
       odom_q = odom->pose.pose.orientation;
   
       // Get the orientation as a Rotation matrix
@@ -323,7 +323,7 @@ void Robot2WCtrl::timer_callback()
       std::vector<geometry_msgs::msg::TransformStamped> v_ts;
       geometry_msgs::msg::TransformStamped ts;
       ts.transform = tf2::toMsg(tf);
-      //ts.header.frame_id = "/odom";      
+      ts.header.frame_id = "/odom";      
       Eigen::Isometry3d T_eigen = tf2::transformToEigen(ts);
       Eigen::Matrix4d T_robot_odom = T_eigen.matrix();
 
@@ -331,28 +331,32 @@ void Robot2WCtrl::timer_callback()
       Eigen::Matrix4d T_odom_robot = T_robot_odom.inverse();
 
       // TODO_10: Define the target point wrt odom as a vector
-      Eigen::Vector3d target_point; 
-      target_point << traj->x, traj->y, traj->z; 
+      Eigen::Vector3d p_t_odom;
+      p_t_odom << traj->x, traj->y, traj->z; 
 
       // TODO_11: Compute the target point wrt to robot.
       // We need to use the homogeneous version of the vector p_t_odom, i.e.,
       // p_t_odom_homogeneous=[p_t_odom;1]^T
-      
+      Eigen::Vector4d p_t_robot;
+      Eigen::Vector4d p_t_odom_homogeneous;
+      p_t_odom_homogeneous << p_t_odom, 1.0;
+      p_t_robot = T_odom_robot*p_t_odom_homogeneous;
 
       // TODO_12: Get the angle in z_robot between the robot and the target point
+      double z_robot_angle = std::atan2(p_t_robot(1), p_t_robot(0));
+      //z_robot_angle = z_robot_angle* (180.0/3.14);
 
         
       // TODO_13: Since the target point is represented with respect to the robot frame
       // The position of the target and the angle are the position and
       // orientation errors in the robot frame
-      error_robot << 0.0, 0.0, 0.0; //you need to replace 0.0, 0.0, 0.0 with the correct values
-      
+      error_robot << p_t_robot(0), p_t_robot(1), z_robot_angle; //you need to replace 0.0, 0.0, 0.0 with the correct values
 
       if (publish_pose_error_)
         RCLCPP_INFO_STREAM(get_logger(), "error_robot= " << error_robot.transpose());
 
       // TODO_14: Compute the cmd velocity using a P-control (Kinematic)
-      Eigen::Vector3d vel = error_robot ; //you need to replace "error_robot" with the correct value
+      Eigen::Vector3d vel = K_*error_robot ; //you need to replace "error_robot" with the correct value
 
       cmd_twist.linear.x = vel[0];
       cmd_twist.linear.y = vel[1];  // This can be omitted!
