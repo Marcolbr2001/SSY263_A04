@@ -215,7 +215,10 @@ void Robot2WCtrl::odom_topic_callback(const Robot2WOdomShPt msg)
 
   // TODO_1: Get the message and assign it to the member variable robot_2w_odom_msg_. 
   // This copy process should be protected with the mutex odom_data_mutex_
- 
+  odom_data_mutex_.lock();
+  robot_2w_odom_msg_ = msg;
+  odom_data_mutex_.unlock();
+
 
   // Flag to control when we have received the robot_2w odometry
   // This flag and the trajectory flag will activate the controller
@@ -229,6 +232,9 @@ void Robot2WCtrl::trajectory_topic_callback(const TrajectoryPointShPt msg)
   
   // TODO_2: copy the msg to the member variable trajectory_point_msg_. This copy process should 
   // be protected with the mutex trajectory_data_mutex_
+  trajectory_data_mutex_.lock();
+  trajectory_point_msg_ = msg;
+  trajectory_data_mutex_.unlock();
 
   // Flag to control when we have received the robot_2w odometry
   // This flag and the trajectory flag will activate the controller
@@ -253,8 +259,10 @@ void Robot2WCtrl::timer_callback()
     // TODO_3: copy the target point obtained by the subscriber into the local variable traj. 
     // This copy process should be protected by the mutex trajectory_data_mutex_
     // Replace the line below with the corresponding copy and mutex
-    TrajectoryPointShPt traj = std::make_shared<geometry_msgs::msg::Point>(); // replace std::make_shared<geometry_msgs::msg::Point>()
-    
+    trajectory_data_mutex_.lock();
+    TrajectoryPointShPt traj = trajectory_point_msg_; // replace std::make_shared<geometry_msgs::msg::Point>()
+    trajectory_data_mutex_.unlock();
+
     geometry_msgs::msg::Twist cmd_twist;
     Eigen::Vector3d error_robot;
     geometry_msgs::msg::Point pos;
@@ -284,13 +292,14 @@ void Robot2WCtrl::timer_callback()
 
       // TODO_4: copy the current odom data from the subscriber into the local variable "odom".
       //  This copy should be protected by the mutex  "odom_data_mutex_"
-      Robot2WOdomShPt odom = std::make_shared<nav_msgs::msg::Odometry>(); // replace std::make_shared<nav_msgs::msg::Odometry>()
-
+      odom_data_mutex_.lock();
+      Robot2WOdomShPt odom = robot_2w_odom_msg_; // replace std::make_shared<nav_msgs::msg::Odometry>()
+      odom_data_mutex_.unlock();
+ 
       // TODO_5: Extract the robot's position and orientation from "odom" into the variables "pos" and "odom_q"
-      pos = geometry_msgs::msg::Point(); // You need to replace "geometry_msgs::msg::Point()" with the correct value.
-      odom_q = geometry_msgs::msg::Quaternion(); //// You need to replace "geometry_msgs::msg::Quaternion()" with the correct value.
-
-   
+      pos = odom->pose.pose.position;
+      odom_q = odom->pose.pose.orientation;
+  
       // Get the orientation as a Rotation matrix
       tf2::Quaternion q(odom_q.x, odom_q.y, odom_q.z, odom_q.w);
       tf2::Matrix3x3 R_robot_odom(q);
@@ -299,21 +308,31 @@ void Robot2WCtrl::timer_callback()
         R_robot_odom.getRPY(roll, pitch, yaw);
 
       // TODO_6: Get the position as a 3D vector
-
+      //Eigen::Vector3d vect_pos;
+      //vect_pos << pos.x, pos.y, pos.z;
+      tf2::Vector3 vect_pos(pos.x, pos.y, pos.z);
 
       // TODO_7: Define the transform between robot and odom using the previous rotation
       // and translation
-
+      tf2::Transform tf;
+      tf.setOrigin(vect_pos);
+      tf.setRotation(q);
 
       // TODO_8: Convert the 3D robot position and orientation into an homogeneous Matrix        
       // For this you need to convert the transform into Homogeneous Transformation
-      
+      std::vector<geometry_msgs::msg::TransformStamped> v_ts;
+      geometry_msgs::msg::TransformStamped ts;
+      ts.transform = tf2::toMsg(tf);
+      //ts.header.frame_id = "/odom";      
+      Eigen::Isometry3d T_eigen = tf2::transformToEigen(ts);
+      Eigen::Matrix4d T_robot_odom = T_eigen.matrix();
 
       // TODO_9: Compute the Homogeneous transformation of odom wrt robot
-      
+      Eigen::Matrix4d T_odom_robot = T_robot_odom.inverse();
 
       // TODO_10: Define the target point wrt odom as a vector
-      
+      Eigen::Vector3d target_point; 
+      target_point << traj->x, traj->y, traj->z; 
 
       // TODO_11: Compute the target point wrt to robot.
       // We need to use the homogeneous version of the vector p_t_odom, i.e.,
