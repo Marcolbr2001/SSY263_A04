@@ -308,22 +308,20 @@ void Robot2WCtrl::timer_callback()
         R_robot_odom.getRPY(roll, pitch, yaw);
 
       // TODO_6: Get the position as a 3D vector
-      //Eigen::Vector3d vect_pos;
-      //vect_pos << pos.x, pos.y, pos.z;
       tf2::Vector3 vect_pos(pos.x, pos.y, pos.z);
 
       // TODO_7: Define the transform between robot and odom using the previous rotation
       // and translation
       tf2::Transform tf;
+      tf.setBasis(R_robot_odom);
       tf.setOrigin(vect_pos);
-      tf.setRotation(q);
 
       // TODO_8: Convert the 3D robot position and orientation into an homogeneous Matrix        
       // For this you need to convert the transform into Homogeneous Transformation
       std::vector<geometry_msgs::msg::TransformStamped> v_ts;
       geometry_msgs::msg::TransformStamped ts;
       ts.transform = tf2::toMsg(tf);
-      ts.header.frame_id = "/odom";      
+      
       Eigen::Isometry3d T_eigen = tf2::transformToEigen(ts);
       Eigen::Matrix4d T_robot_odom = T_eigen.matrix();
 
@@ -340,12 +338,11 @@ void Robot2WCtrl::timer_callback()
       Eigen::Vector4d p_t_robot;
       Eigen::Vector4d p_t_odom_homogeneous;
       p_t_odom_homogeneous << p_t_odom, 1.0;
+
       p_t_robot = T_odom_robot*p_t_odom_homogeneous;
 
       // TODO_12: Get the angle in z_robot between the robot and the target point
       double z_robot_angle = std::atan2(p_t_robot(1), p_t_robot(0));
-      //z_robot_angle = z_robot_angle* (180.0/3.14);
-
         
       // TODO_13: Since the target point is represented with respect to the robot frame
       // The position of the target and the angle are the position and

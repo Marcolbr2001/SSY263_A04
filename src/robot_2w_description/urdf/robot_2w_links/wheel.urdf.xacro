@@ -35,7 +35,7 @@
     <joint name="${prefix}${side}_wheel_joint" type="continuous">
         <parent link="${prefix}${parent}" />
         <child link="${prefix}${side}_wheel_link" />
-        <origin xyz="-0.02 ${flip*wheel_distance/2.0} -0.04" />
+        <origin xyz="0.0 ${flip*wheel_distance/2.0} -0.045" />
         <axis xyz="0 1 0" />
     </joint>
 
